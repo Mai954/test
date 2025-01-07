@@ -62,7 +62,7 @@ def lnprob(theta, obs_dis,obs_dis_err,r_obs):
         return -np.inf
     return lp + lnlike(theta,obs_dis,obs_dis_err,r_obs)
 
- #Set up some walkers in a gaussian ball around the maximum likelyhood result
+#Set up some walkers in a gaussian ball around the maximum likelyhood result
 initial_guess=np.zeros((4))
 initial_guess[0]=1.0e10# Ie, Msun
 initial_guess[1]=1#re, kpc
@@ -80,4 +80,34 @@ sampler = emcee.EnsembleSampler(num_walkers, num_params, lnprob, args=(obs_dis,o
 # sampler.reset()
 num_steps = 5000
 pos0, prob, state = sampler.run_mcmc(pos, num_steps,progress=True)
+
+#And plot the paths of the walkers
+fig, axes = plt.subplots(4, figsize=(10, 7), sharex=True)
+samples = sampler.get_chain()
+labels = ["Ie", "re", "n", "Mbh"]
+for i in range(num_params):
+    ax = axes[i]
+    ax.plot(samples[:, :, i], "k", alpha=0.3)
+    ax.set_xlim(0, len(samples))
+    ax.set_ylabel(labels[i])
+    ax.yaxis.set_label_coords(-0.1, 0.5)
+
+axes[-1].set_xlabel("step number");
+
+#Generate the Posterior distribution
+import corner
+samples = sampler.chain[:,:,:].reshape((-1, num_params))
+print(samples.shape)
+
+fig = corner.corner(samples, labels=labels)
+
+#print the results of fitted parameters
+from IPython.display import display, Math
+
+for i in range(num_params):
+    mcmc = np.percentile(samples[:, i], [16, 50, 84])
+    q = np.diff(mcmc)
+    txt = "\mathrm{{{3}}} = {0:.3f}_{{-{1:.3f}}}^{{{2:.3f}}}"
+    txt = txt.format(mcmc[1], q[0], q[1], labels[i])
+    display(Math(txt))
 
