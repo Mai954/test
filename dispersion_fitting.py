@@ -5,20 +5,6 @@ from matplotlib import pyplot
 from astropy.modeling.models import Sersic1D
 from scipy import integrate
 ###################################
-# np.random.seed(123)
-# # Choose the "true" parameters.
-# m_true = -0.9594
-# b_true = 4.294
-# f_true = 0.534
-
-# # Generate some synthetic data from the model.
-# N = 50
-# x = np.sort(10 * np.random.rand(N))
-# # print(x)
-# yerr = 0.1 + 0.5 * np.random.rand(N)
-# y = m_true * x + b_true
-# y += np.abs(f_true * y) * np.random.randn(N)
-# y += yerr * np.random.randn(N)
 
 G = 0.004301
 obs_dis=np.array([300,245,180,289,211,191,176,202,191])
@@ -62,7 +48,7 @@ def lnprob(theta, obs_dis,obs_dis_err,r_obs):
         return -np.inf
     return lp + lnlike(theta,obs_dis,obs_dis_err,r_obs)
 
-#Set up some walkers in a gaussian ball around the maximum likelyhood result
+#Set up walkers
 initial_guess=np.zeros((4))
 initial_guess[0]=1.0e10# Ie, Msun
 initial_guess[1]=1#re, kpc
