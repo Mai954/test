@@ -1,11 +1,18 @@
 import numpy as np
+from astropy import units as u
 import matplotlib.pyplot as plt
 import emcee
 from matplotlib import pyplot
 from astropy.modeling.models import Sersic1D
 from scipy import integrate
-###################################
+from multiprocessing import Pool
+from multiprocessing import cpu_count
+ncpu = cpu_count()
+print("{0} CPUs".format(ncpu))
 
+# import os
+# os.environ["OMP_NUM_THREADS"] = "1"
+############load the observed data###################
 G = 0.004301
 obs_dis=np.array([300,245,180,289,211,191,176,202,191])
 obs_dis_err=np.array([3,21,15,6,22,20,18,18,20])
@@ -19,14 +26,13 @@ plt.ylim(50, 500)
 plt.xlabel("arcsec")
 plt.ylabel("Sigma");
 
-# log prior
+############define the likelihood function##############
 def lnprior(theta):
     Ie,re,n,mass_BH = theta
     if 1.0e10 <Ie< 1.0e12 and 0.1<re<3 and 0.4<n<10 and 1.0e8<mass_BH<1.0e10:
         return 0.0
     return -np.inf
 
-# log likelihood function
 def lnlike(theta, obs_dis,obs_dis_err,r_obs):
     Ie,re,n,mass_BH = theta
     
@@ -41,32 +47,37 @@ def lnlike(theta, obs_dis,obs_dis_err,r_obs):
     model = np.sqrt(dis_bulge+dis_BH)
     return -0.5 * np.sum((obs_dis - model)**2/obs_dis_err**2)
 
-# log probability function
 def lnprob(theta, obs_dis,obs_dis_err,r_obs):
     lp = lnprior(theta)
     if not np.isfinite(lp):
         return -np.inf
     return lp + lnlike(theta,obs_dis,obs_dis_err,r_obs)
 
+############run the emcee###############################
 #Set up walkers
 initial_guess=np.zeros((4))
 initial_guess[0]=1.0e10# Ie, Msun
 initial_guess[1]=1#re, kpc
 initial_guess[2]=1# n
 initial_guess[3]=5.0e9# mass_bh,Msun
-# print(initial_guess)
-num_params, num_walkers = 4, 100
-# initial positions of the walkers
+num_params, num_walkers = 4, 50
 pos = [initial_guess+1.e-4*np.random.randn(num_params) for i in range(num_walkers)]
-# print(pos)
 
-# set up the sampler
-sampler = emcee.EnsembleSampler(num_walkers, num_params, lnprob, args=(obs_dis,obs_dis_err,r_obs))
-#and send it on a walk
-# sampler.reset()
-num_steps = 5000
-pos0, prob, state = sampler.run_mcmc(pos, num_steps,progress=True)
+with Pool() as pool:
+    sampler = emcee.EnsembleSampler(num_walkers, num_params, lnprob, args=(obs_dis,obs_dis_err,r_obs),pool=pool)
+    #burn-in
+    start = time.time()
+    state = sampler.run_mcmc(pos,500,progress=True)
+    sampler.reset()
+    sampler.reset()
+    num_steps = 500
+    sampler.run_mcmc(state, num_steps,progress=True)
+    end = time.time()
+    multi_time = end - start
+    print("Multiprocessing took {0:.1f} seconds".format(multi_time))
+    # print("{0:.1f} times faster than serial".format(serial_time / multi_time))
 
+############plot the results###############################
 #And plot the paths of the walkers
 fig, axes = plt.subplots(4, figsize=(10, 7), sharex=True)
 samples = sampler.get_chain()
@@ -79,6 +90,7 @@ for i in range(num_params):
     ax.yaxis.set_label_coords(-0.1, 0.5)
 
 axes[-1].set_xlabel("step number");
+# fig.savefig('home/mailiao/dispersion_profile/walkers.pdf', bbox_inches='tight')
 
 #Generate the Posterior distribution
 import corner
@@ -86,14 +98,22 @@ samples = sampler.chain[:,:,:].reshape((-1, num_params))
 print(samples.shape)
 
 fig = corner.corner(samples, labels=labels)
+# fig.savefig('home/mailiao/dispersion_profile/distributions.pdf', bbox_inches='tight')
 
-#print the results of fitted parameters
+#print and save the results for each fitted parameters
 from IPython.display import display, Math
 
+results=np.zeros((4,3))
 for i in range(num_params):
     mcmc = np.percentile(samples[:, i], [16, 50, 84])
     q = np.diff(mcmc)
     txt = "\mathrm{{{3}}} = {0:.3f}_{{-{1:.3f}}}^{{{2:.3f}}}"
     txt = txt.format(mcmc[1], q[0], q[1], labels[i])
+    results[i,:]=mcmc[1], q[0], q[1]
+    if i ==0:
+        txt = txt.format(mcmc[1]/1.e11, q[0]/1.e11, q[1]/1.e11, labels[i])
+        results[i,:]=mcmc[1]/1.e11, q[0]/1.e11, q[1]/1.e11
+    if i ==0 and i ==3:
+        txt = txt.format(mcmc[1]/1.e9, q[0]/1.e9, q[1]/1.e9, labels[i])
+        results[i,:]=mcmc[1]/1.e9, q[0]/1.e9, q[1]/1.e9
     display(Math(txt))
-
