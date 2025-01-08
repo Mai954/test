@@ -28,7 +28,8 @@ plt.ylabel("Sigma");
 ############define the likelihood function##############
 def lnprior(theta):
     Ie,re,n,mass_BH = theta
-    if 1.0e10 <Ie< 1.0e12 and 0.1<re<3 and 0.4<n<10 and 1.0e8<mass_BH<1.0e10:
+    # if 1.0e10 <Ie< 1.0e12 and 0.1<re<3 and 0.4<n<10 and 1.0e8<mass_BH<1.0e10:
+    if 0.1<re<3 and 0.5 <= n <=8:
         return 0.0
     return -np.inf
 
@@ -64,17 +65,10 @@ pos = [initial_guess+1.e-4*np.random.randn(num_params) for i in range(num_walker
 with Pool() as pool:
     sampler = emcee.EnsembleSampler(num_walkers, num_params, lnprob, args=(obs_dis,obs_dis_err,r_obs),pool=pool)
     #burn-in
-    start = time.time()
-    state = sampler.run_mcmc(pos,500,progress=True)
+    state = sampler.run_mcmc(pos,1000,progress=True)
     sampler.reset()
-    sampler.reset()
-    num_steps = 500
+    num_steps = 1000
     sampler.run_mcmc(state, num_steps,progress=True)
-    end = time.time()
-    multi_time = end - start
-    print("Multiprocessing took {0:.1f} seconds".format(multi_time))
-    # print("{0:.1f} times faster than serial".format(serial_time / multi_time))
-
 ############plot the results###############################
 #And plot the paths of the walkers
 fig, axes = plt.subplots(4, figsize=(10, 7), sharex=True)
@@ -87,16 +81,19 @@ for i in range(num_params):
     ax.set_ylabel(labels[i])
     ax.yaxis.set_label_coords(-0.1, 0.5)
 axes[-1].set_xlabel("step number");
-# fig.savefig('home/mailiao/dispersion_profile/walkers.pdf', bbox_inches='tight')
+fig.savefig('home/mailiao/dispersion_profile/walkers.pdf', bbox_inches='tight')
 
 #Generate the Posterior distribution
 import corner
 samples = sampler.chain[:,:,:].reshape((-1, num_params))
 print(samples.shape)
 fig = corner.corner(samples, labels=labels)
-# fig.savefig('home/mailiao/dispersion_profile/distributions.pdf', bbox_inches='tight')
+fig.savefig('home/mailiao/dispersion_profile/distributions.pdf', bbox_inches='tight')
 
 #print and save the results for each fitted parameters
+from IPython.display import display, Math
+
+#######print and save the results for each fitted parameters###########################
 from IPython.display import display, Math
 
 results=np.zeros((4,3))
@@ -106,4 +103,43 @@ for i in range(num_params):
     txt = "\mathrm{{{3}}} = {0:.3f}_{{-{1:.3f}}}^{{{2:.3f}}}"
     txt = txt.format(mcmc[1], q[0], q[1], labels[i])
     results[i,:]=mcmc[1], q[0], q[1]
+    # if i ==0:
+    #     txt = txt.format(mcmc[1]/1.e11, q[0]/1.e11, q[1]/1.e11)
+    #     results[i,:]=mcmc[1]/1.e11, q[0]/1.e11, q[1]/1.e11
+    # if i ==3:
+    #     txt = txt.format(mcmc[1]/1.e9, q[0]/1.e9, q[1]/1.e9,)
+    #     results[i,:]=mcmc[1]/1.e9, q[0]/1.e9, q[1]/1.e9
     display(Math(txt))
+
+################plot the results#########################################
+def BH_dispersion(mass_BH,r_obs):
+    return G*mass_BH/r_obs*2/3./1000
+
+
+def bulge_dispersion(Ie,re,n,r_obs):
+    s1 = Sersic1D(amplitude=Ie, r_eff=re)
+    s1.n = n
+    f = lambda x: s1(x)*x
+    mass_bulge=np.zeros((len(r_obs)))
+    for j in range (0,len(r_obs)):
+        mass_bulge[j]=integrate.quad(f,0,r_obs[j])[0]  
+    return G*mass_bulge/r_obs*2/3./1000
+    
+def total_dispersion(Ie,re,n,mass_BH,r_obs):
+    model = np.sqrt(BH_dispersion(mass_BH,r_obs)+bulge_dispersion(Ie,re,n,r_obs))
+    return model
+
+
+plt.errorbar(r_obs/6.535, obs_dis, yerr=obs_dis_err, fmt=".k", capsize=0)
+x0 = np.linspace(0, 0.5, 500)
+# plt.plot(x0, np.sqrt(G*10**9*5/x0/6.535/1000), "-k", alpha=0.3, lw=3)# plot the curve with 5 times 10^9 Msun
+
+plt.plot(x0, np.sqrt(BH_dispersion(results[3,0],x0*6.535)), "-m", alpha=0.3, lw=3,label='BH')# plot fitting bh mass
+plt.plot(x0, np.sqrt(bulge_dispersion(results[0,0],results[1,0],results[2,0],x0*6.535)), "-k", alpha=0.3, lw=3,label='bulge')# plot fitting bulge
+plt.plot(x0, total_dispersion(results[0,0],results[1,0],results[2,0],results[3,0],x0*6.535), "-r", alpha=0.3, lw=3,label='total')# plot fitting total
+plt.legend(loc=[0.6,0.6],fontsize=10)
+plt.xlim(0, 0.3)
+plt.ylim(50, 500)
+plt.xlabel("arcsec")
+plt.ylabel("Sigma")
+fig.savefig('home/mailiao/dispersion_profile/results.pdf', bbox_inches='tight')
