@@ -106,10 +106,4 @@ for i in range(num_params):
     txt = "\mathrm{{{3}}} = {0:.3f}_{{-{1:.3f}}}^{{{2:.3f}}}"
     txt = txt.format(mcmc[1], q[0], q[1], labels[i])
     results[i,:]=mcmc[1], q[0], q[1]
-    if i ==0:
-        txt = txt.format(mcmc[1]/1.e11, q[0]/1.e11, q[1]/1.e11, labels[i])
-        results[i,:]=mcmc[1]/1.e11, q[0]/1.e11, q[1]/1.e11
-    if i ==0 and i ==3:
-        txt = txt.format(mcmc[1]/1.e9, q[0]/1.e9, q[1]/1.e9, labels[i])
-        results[i,:]=mcmc[1]/1.e9, q[0]/1.e9, q[1]/1.e9
     display(Math(txt))
