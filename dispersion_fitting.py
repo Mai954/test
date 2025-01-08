@@ -25,7 +25,6 @@ plt.xlim(0, 0.3)
 plt.ylim(50, 500)
 plt.xlabel("arcsec")
 plt.ylabel("Sigma");
-
 ############define the likelihood function##############
 def lnprior(theta):
     Ie,re,n,mass_BH = theta
@@ -52,7 +51,6 @@ def lnprob(theta, obs_dis,obs_dis_err,r_obs):
     if not np.isfinite(lp):
         return -np.inf
     return lp + lnlike(theta,obs_dis,obs_dis_err,r_obs)
-
 ############run the emcee###############################
 #Set up walkers
 initial_guess=np.zeros((4))
@@ -88,7 +86,6 @@ for i in range(num_params):
     ax.set_xlim(0, len(samples))
     ax.set_ylabel(labels[i])
     ax.yaxis.set_label_coords(-0.1, 0.5)
-
 axes[-1].set_xlabel("step number");
 # fig.savefig('home/mailiao/dispersion_profile/walkers.pdf', bbox_inches='tight')
 
@@ -96,7 +93,6 @@ axes[-1].set_xlabel("step number");
 import corner
 samples = sampler.chain[:,:,:].reshape((-1, num_params))
 print(samples.shape)
-
 fig = corner.corner(samples, labels=labels)
 # fig.savefig('home/mailiao/dispersion_profile/distributions.pdf', bbox_inches='tight')
 
